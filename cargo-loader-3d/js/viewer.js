@@ -39,7 +39,14 @@ export class Viewer {
     cv.addEventListener('pointerdown', e => this.onDown(e), { capture: true });
     cv.addEventListener('pointermove', e => this.onMove(e));
     cv.addEventListener('pointerup', e => this.onUp(e));
-    const loop = () => { requestAnimationFrame(loop); this.ctl.update(); this.r.render(this.scene, this.cam); };
+    const loop = () => {
+      requestAnimationFrame(loop);
+      try {
+        const p = this.cam.position;
+        if (!Number.isFinite(p.x + p.y + p.z)) this.resetView();
+        this.ctl.update(); this.r.render(this.scene, this.cam);
+      } catch (e) { if (!this.errShown) { this.errShown = true; console.error(e); } }
+    };
     loop();
   }
 
@@ -48,8 +55,12 @@ export class Viewer {
     this.r.setSize(w, h); this.cam.aspect = w / h; this.cam.updateProjectionMatrix();
   }
   boxColor(b) { return this.colorBy === 'group' ? GROUP_PAL[(b.group - 1) % GROUP_PAL.length] : b.color; }
-
+  sane(c) {
+    const n = (v, d) => (Number.isFinite(+v) && +v > 0 ? +v : d);
+    return { ...c, L: n(c.L, 100), W: n(c.W, 100), H: n(c.H, 100) };
+  }
   setScene(cont, placed, colorBy, cog, labels, keepCam = false) {
+    cont = this.sane(cont);
     this.colorBy = colorBy; this.dims = cont; this.sel = null; this.labelsOn = !!labels;
     while (this.group.children.length) {
       const o = this.group.children.pop();
@@ -128,7 +139,7 @@ export class Viewer {
   setStep(n) { this.step = n; this.updateVisibility(); }
   setTypeVisible(t, v) { v ? this.hidden.delete(t) : this.hidden.add(t); this.updateVisibility(); }
   setWalls(v) { this.walls.forEach(w => { w.visible = v; }); }
-  setClip(f) { this.clip.constant = f >= 1 ? 999 : f * this.dims.H * S; }
+  setClip(f) { f = Number.isFinite(f) ? f : 1; this.clip.constant = f >= 1 ? 999 : f * this.dims.H * S; }
   setAutoRotate(v) { this.ctl.autoRotate = v; }
   setEdit(v) { this.edit = v; }
   setLabels(v) { this.labelsOn = v; this.meshes.forEach(m => { if (m.userData.label) m.userData.label.visible = v; }); }

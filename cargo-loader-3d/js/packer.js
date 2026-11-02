@@ -165,12 +165,16 @@ function runOne(cont, items, locked, lifo, st, maxC) {
   return { containers, unplaced: rest };
 }
 
+export const BEST_MAX_ITEMS = 400;
+
 export function solve({ cont, items, lifo = false, mode = 'fast', locked = {}, maxContainers = 1 }) {
-  const sorts = mode === 'best' ? ['volume', 'longest', 'area'] : ['volume'];
+  const eff = mode === 'best' && items.length <= BEST_MAX_ITEMS ? 'best' : 'fast';
+  const sorts = eff === 'best' ? ['volume', 'longest', 'area'] : ['volume'];
   const primary = primaryDoor(doorsOf(cont));
-  const axes = lifo ? [primary === 'top' ? 'yxz' : 'xyz'] : mode === 'best' ? ['yxz', 'yzx', 'xyz'] : ['yxz'];
+  const axes = lifo ? [primary === 'top' ? 'yxz' : 'xyz'] : eff === 'best' ? ['yxz', 'yzx', 'xyz'] : ['yxz'];
   const cv = cont.L * cont.W * cont.H;
   let best = null;
+  search:
   for (const a of axes) for (const s of sorts) {
     const st = { axes: a, sort: s };
     const r = runOne(cont, items, locked, lifo, st, Math.max(1, maxContainers));
@@ -178,6 +182,7 @@ export function solve({ cont, items, lifo = false, mode = 'fast', locked = {}, m
     const score = [r.unplaced.length, r.containers.length, -vol / (cv * r.containers.length)];
     if (!best || score[0] < best.score[0] || (score[0] === best.score[0] && (score[1] < best.score[1] || (score[1] === best.score[1] && score[2] < best.score[2]))))
       best = { ...r, score, strategy: `${a}/${s}` };
+    if (best.score[0] === 0 && best.score[1] === 1) break search;
   }
-  return { containers: best.containers, unplaced: best.unplaced, strategy: best.strategy };
+  return { containers: best.containers, unplaced: best.unplaced, strategy: best.strategy, downgraded: mode === 'best' && eff === 'fast' };
 }

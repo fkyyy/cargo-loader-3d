@@ -1,7 +1,7 @@
 import { solve, summarize } from "./packer.js";
 import { audit, canPlace, settleY, recalcLevels } from "./editor.js";
 import { Viewer, GROUP_PAL } from "./viewer.js";
-import { FLEET } from './fleet.js';
+import { FLEET } from "./fleet.js";
 import * as io from "./io.js";
 
 const $ = (id) => document.getElementById(id);
@@ -139,23 +139,46 @@ const ROT = [
   ["flat", "Hanya horizontal"],
   ["none", "Tanpa rotasi"],
 ];
+const advText = t => [`${r2(toW(t.weight))} ${st.opts.wt}`, `tujuan #${t.group}`,
+  t.rot === 'flat' ? 'rotasi horizontal' : t.rot === 'none' ? 'tanpa rotasi' : null,
+  t.fragile ? 'rapuh' : null, t.maxStack > 0 ? `maks level ${t.maxStack}` : null].filter(Boolean).join(' · ');
+const boxTotals = () => `${st.types.length} jenis · ${st.types.reduce((a, t) => a + (t.q || 0), 0)} box`;
 function renderTypes() {
-  $("types").innerHTML = st.types
-    .map(
-      (t, i) => `
+  $('types').innerHTML = `<div class="hint" id="boxTotals">${boxTotals()}</div>` + st.types.map((t, i) => `
   <div class="card" data-i="${i}">
-    <div class="r"><input type="color" class="sw" data-k="color" value="${t.color}">
-      <input type="text" data-k="name" value="${t.name}"><button class="x" data-del="${i}">✕</button></div>
-    <div class="g4">${num("l", "P", r2(toL(t.l)))}${num("w", "L", r2(toL(t.w)))}${num("h", "T", r2(toL(t.h)))}${num("q", "Qty", t.q)}</div>
-    <div class="g4">${num("weight", "Berat " + st.opts.wt, r2(toW(t.weight)))}${num("group", "Tujuan #", t.group)}
-      <div style="grid-column:span 2"><label class="s">Rotasi</label><select data-k="rot">
-        ${ROT.map(([v, n]) => `<option value="${v}"${t.rot === v ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
-    <label class="ck"><input type="checkbox" data-k="fragile" ${t.fragile ? "checked" : ""}> Rapuh (tidak boleh ditindih)</label>
-    <div class="r" style="margin-top:6px"><label class="s" style="margin:0;flex:1">Maks. level tumpukan (0 = bebas)</label>
-      <input type="number" data-k="maxStack" value="${t.maxStack}" min="0" style="width:64px"></div>
-  </div>`,
-    )
-    .join("");
+    <!-- Baris Utama: Warna, Nama, Qty, Hapus -->
+    <div class="r">
+      <input type="color" class="sw" data-k="color" value="${t.color}" title="Warna Box">
+      <input type="text" data-k="name" value="${t.name}" placeholder="Nama Box" style="flex:1">
+      <input type="number" data-k="q" value="${t.q}" min="0" placeholder="Qty" title="Jumlah" style="width:56px">
+      <button class="x" data-del="${i}" title="Hapus">✕</button>
+    </div>
+
+    <div class="g3">
+      ${num('l', `P (${st.opts.len})`, r2(toL(t.l)))}
+      ${num('w', `L (${st.opts.len})`, r2(toL(t.w)))}
+      ${num('h', `T (${st.opts.len})`, r2(toL(t.h)))}
+    </div>
+
+    <details class="adv">
+      <summary>Pengaturan Lanjutan <span style="float:right; opacity:0.7">${advText(t)}</span></summary>
+      <div class="g4" style="margin-top:6px">
+        ${num('weight', `Berat (${st.opts.wt})`, r2(toW(t.weight)))}
+        ${num('group', 'Tujuan #', t.group)}
+      </div>
+      <div class="r" style="margin-bottom:6px">
+        <label class="s" style="flex:1; font-size:11px">Rotasi</label>
+        <select data-k="rot" style="flex:1">${ROT.map(([v, n]) => `<option value="${v}"${t.rot === v ? ' selected' : ''}>${n}</option>`).join('')}</select>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:4px">
+        <label class="ck"><input type="checkbox" data-k="fragile" ${t.fragile ? 'checked' : ''}> Rapuh</label>
+        <div style="display:flex; align-items:center; gap:4px">
+          <span class="s">Maks Tumpuk:</span>
+          <input type="number" data-k="maxStack" value="${t.maxStack}" min="0" style="width:48px">
+        </div>
+      </div>
+    </details>
+  </div>`).join('');
 }
 $("types").addEventListener("input", (e) => {
   const c = e.target.closest(".card"),
@@ -167,7 +190,9 @@ $("types").addEventListener("input", (e) => {
   else if (["name", "color", "rot"].includes(k)) t[k] = e.target.value;
   else if (["l", "w", "h"].includes(k)) t[k] = Math.max(0, fromL(v || 0));
   else if (k === "weight") t[k] = Math.max(0, fromW(v || 0));
-  else t[k] = Math.max(0, Math.round(v || 0));
+    else t[k] = Math.max(0, Math.round(v || 0));
+  const sum = c.querySelector('.advsum'); if (sum) sum.textContent = advText(t);
+  const tot = $('boxTotals'); if (tot) tot.textContent = boxTotals();
 });
 $("types").addEventListener("click", (e) => {
   if (e.target.dataset.del !== undefined) {
@@ -233,6 +258,7 @@ $("preset").innerHTML =
 $("preset").onchange = (e) => {
   if (e.target.value === "") return;
   const f = FLEET[+e.target.value];
+    if (!(f.L > 0 && f.W > 0 && f.H > 0)) { flash('Data armada tidak lengkap (L/W/H)'); return; }
   Object.assign(st.cont, {
     L: f.L,
     W: f.W,
@@ -286,70 +312,91 @@ $("colorBy").onchange = (e) => {
 };
 
 function runSolve(p) {
-  return new Promise((res) => {
+  return new Promise((resolve, reject) => {
+    const local = () => {
+      try {
+        resolve(solve(p));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    let w;
     try {
-      worker ??= new Worker(new URL("./worker.js", import.meta.url), {
+      w = worker ??= new Worker(new URL("./worker.js", import.meta.url), {
         type: "module",
       });
-      worker.onmessage = (e) => res(e.data);
-      worker.onerror = () => {
-        worker = null;
-        res(solve(p));
-      };
-      worker.postMessage(p);
     } catch {
-      res(solve(p));
+      return local();
     }
+    w.onmessage = (e) => resolve(e.data);
+    w.onerror = (ev) => {
+      worker = null;
+      ev.preventDefault?.();
+      local();
+    };
+    w.onmessageerror = () => {
+      worker = null;
+      local();
+    };
+    w.postMessage(p);
   });
 }
+
 async function doPack(keep) {
   if (busy) return;
   busy = true;
   stopPlay();
   $("stats").textContent = "Menghitung…";
   $("pack").disabled = $("repack").disabled = true;
-  const locked = {},
-    lc = {};
-  if (keep)
-    plan.containers.forEach((c, k) => {
-      const l = c.placed.filter((b) => b.locked);
-      if (l.length) {
-        locked[k] = l.map((b) => ({ ...b }));
-        l.forEach((b) => {
-          lc[b.type] = (lc[b.type] || 0) + 1;
-        });
-      }
+  try {
+    const locked = {},
+      lc = {};
+    if (keep)
+      plan.containers.forEach((c, k) => {
+        const l = c.placed.filter((b) => b.locked);
+        if (l.length) {
+          locked[k] = l.map((b) => ({ ...b }));
+          l.forEach((b) => {
+            lc[b.type] = (lc[b.type] || 0) + 1;
+          });
+        }
+      });
+    const items = [];
+    st.types.forEach((t, i) => {
+      if (!(t.l > 0 && t.w > 0 && t.h > 0)) return;
+      for (let k = 0, n = Math.max(0, t.q - (lc[i] || 0)); k < n; k++)
+        items.push({ ...t, type: i });
     });
-  const items = [];
-  st.types.forEach((t, i) => {
-    if (!(t.l > 0 && t.w > 0 && t.h > 0)) return;
-    for (let k = 0, n = Math.max(0, t.q - (lc[i] || 0)); k < n; k++)
-      items.push({ ...t, type: i });
-  });
-  if (!(st.cont.L > 0 && st.cont.W > 0 && st.cont.H > 0)) {
+    if (!(st.cont.L > 0 && st.cont.W > 0 && st.cont.H > 0)) {
+      $("stats").innerHTML =
+        '<span class="warn">Ukuran container tidak valid.</span>';
+      return;
+    }
+    const r = await runSolve({
+      cont: st.cont,
+      items,
+      lifo: st.opts.lifo,
+      mode: st.opts.mode,
+      locked,
+      maxContainers: st.opts.maxc,
+    });
+    plan = {
+      containers: r.containers.map((c) => ({ placed: c.placed })),
+      unplaced: r.unplaced,
+      strategy: r.strategy,
+    };
+    ci = 0;
+    render();
+    if (r.downgraded)
+      flash("Box > 400: mode Optimal diganti Cepat agar tidak lambat");
+  } catch (err) {
+    console.error(err);
+    $("stats").innerHTML =
+      `<span class="warn">Gagal menghitung: ${err && err.message ? err.message : err}</span>`;
+  } finally {
     busy = false;
     $("pack").disabled = $("repack").disabled = false;
-    $("stats").innerHTML =
-      '<span class="warn">Ukuran container tidak valid.</span>';
-    return;
   }
-  const r = await runSolve({
-    cont: st.cont,
-    items,
-    lifo: st.opts.lifo,
-    mode: st.opts.mode,
-    locked,
-    maxContainers: st.opts.maxc,
-  });
-  plan = {
-    containers: r.containers.map((c) => ({ placed: c.placed })),
-    unplaced: r.unplaced,
-    strategy: r.strategy,
-  };
-  ci = 0;
-  busy = false;
-  $("pack").disabled = $("repack").disabled = false;
-  render();
 }
 $("pack").onclick = () => doPack(false);
 $("repack").onclick = () => doPack(true);
