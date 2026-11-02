@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cargo Loader 3D</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="r"><h1 style="flex:1;margin:0">Cargo Loader Warehouse 3D</h1><button id="theme" title="Ganti tema">◐</button></div>
+
+  <div class="tabbar" role="tablist" aria-label="Menu">
+    <button class="tab active" role="tab" id="tab-container" data-tab="container" aria-controls="panel-container" aria-selected="true">Container</button>
+    <button class="tab" role="tab" id="tab-box" data-tab="box" aria-controls="panel-box" aria-selected="false">Box</button>
+    <button class="tab" role="tab" id="tab-opsi" data-tab="opsi" aria-controls="panel-opsi" aria-selected="false">Opsi</button>
+    <button class="tab" role="tab" id="tab-hasil" data-tab="hasil" aria-controls="panel-hasil" aria-selected="false">Hasil</button>
+    <button class="tab" role="tab" id="tab-file" data-tab="file" aria-controls="panel-file" aria-selected="false">File</button>
+  </div>
+
+  <div class="tabpanels">
+
+    <section class="panel active" role="tabpanel" id="panel-container" aria-labelledby="tab-container">
+      <h2>Satuan</h2>
+      <div class="r">
+        <select id="ulen"><option>cm</option><option>m</option><option>in</option></select>
+        <select id="uwt"><option>kg</option><option>lb</option></select>
+      </div>
+
+      <h2>Container (<span class="ul">cm</span> / <span class="uw">kg</span>)</h2>
+      <div class="g4">
+        <div><label class="s">Panjang</label><input type="number" id="cl"></div>
+        <div><label class="s">Lebar</label><input type="number" id="cw"></div>
+        <div><label class="s">Tinggi</label><input type="number" id="ch"></div>
+        <div><label class="s">Maks berat</label><input type="number" id="cmax"></div>
+      </div>
+           <div class="r">
+        <select id="preset" style="flex:1"></select>
+        <label class="s" style="margin:0;white-space:nowrap">Maks container</label>
+        <input type="number" id="maxc" value="3" min="1" max="20" style="width:56px">
+      </div>
+      <div class="r">
+        <label class="s" style="margin:0;flex:1">Maks volume (m³, 0 = tanpa batas)</label>
+        <input type="number" id="cvol" min="0" step="any" style="width:90px">
+      </div>
+      <h2>Pintu</h2>
+      <div class="doors">
+        <label class="ck"><input type="checkbox" data-door="back"> Belakang</label>
+        <label class="ck"><input type="checkbox" data-door="front"> Depan</label>
+        <label class="ck"><input type="checkbox" data-door="left"> Samping A (z = 0)</label>
+        <label class="ck"><input type="checkbox" data-door="right"> Samping B (z = lebar)</label>
+        <label class="ck"><input type="checkbox" data-door="top"> Atas</label>
+      </div>
+      <p class="hint">Sisi pintu berwarna oranye, sisi lain dinding. Boleh pilih lebih dari satu.</p>
+      <p class="hint">Pintu container ada di sisi kanan (oranye).</p>
+      <div class="r"><button class="next" data-goto="box" style="flex:1">Lanjut: Jenis box →</button></div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-box" aria-labelledby="tab-box" hidden>
+      <h2>Tambah dari katalog</h2>
+      <div class="catalog">
+        <label class="s">Pilih ukuran standar (data MATERIAL PACKAGING UTX)</label>
+        <div class="r">
+          <select id="catSel" style="flex:1"></select>
+          <input type="number" id="catQty" value="1" min="1" title="Jumlah box" style="width:56px">
+        </div>
+        <p class="hint" id="catDim"></p>
+        <div class="r"><button class="p" id="catAdd" style="flex:1">+ Tambah dari katalog</button></div>
+      </div>
+
+      <h2>Jenis box (bisa diedit)</h2>
+      <div id="types"></div>
+      <div class="r"><button id="add">+ Tambah custom (isi sendiri)</button></div>
+      <div class="r">
+        <button class="back" data-goto="container" style="flex:1">← Kembali</button>
+        <button class="next" data-goto="opsi" style="flex:1">Lanjut: Opsi →</button>
+      </div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-opsi" aria-labelledby="tab-opsi" hidden>
+      <h2>Opsi</h2>
+      <label class="ck"><input type="checkbox" id="lifo"> LIFO: tujuan #1 dibongkar pertama</label>
+      <div class="r" style="margin-top:6px"><label class="s" style="margin:0;flex:1">Algoritma</label>
+        <select id="mode" style="width:auto"><option value="fast">Cepat</option><option value="best">Optimal (coba banyak strategi)</option></select></div>
+      <div class="r"><label class="s" style="margin:0;flex:1">Warna berdasarkan</label>
+        <select id="colorBy" style="width:auto"><option value="type">Jenis box</option><option value="group">Tujuan</option></select></div>
+      <div class="r">
+        <button class="back" data-goto="box" style="flex:1">← Kembali</button>
+        <button class="next" data-goto="hasil" style="flex:1">Ke Hasil →</button>
+      </div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-hasil" aria-labelledby="tab-hasil" hidden>
+      <div class="stats" id="stats"></div>
+      <div id="legend"></div>
+      <div class="stats">
+        <div id="info">Klik sebuah box di 3D untuk melihat detailnya.</div>
+        <div class="r wrap" id="selbtns" style="display:none;margin:8px 0 0">
+          <button id="bLock">Kunci</button><button id="bRot">Putar 90° (R)</button><button id="bDel">Keluarkan (Del)</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-file" aria-labelledby="tab-file" hidden>
+      <h2>Proyek</h2>
+      <div class="r wrap">
+        <button id="bSave">Simpan</button><button id="bLoad">Muat</button>
+      </div>
+      <h2>Data box (CSV)</h2>
+      <div class="r wrap">
+        <button id="bCsv">Import CSV</button><button id="bExpCsv">Export CSV</button>
+      </div>
+      <h2>Bagikan</h2>
+      <div class="r wrap">
+        <button id="bReport">Laporan PDF</button><button id="bShare">Link share</button>
+      </div>
+      <input type="file" id="fLoad" accept=".json" hidden><input type="file" id="fCsv" accept=".csv,.txt" hidden>
+    </section>
+
+  </div>
+
+  <div class="packbar">
+    <button class="p" id="pack" style="flex:1">Susun (reset)</button>
+    <button id="repack" style="flex:1" title="Pertahankan box yang dikunci">Susun ulang (kunci tetap)</button>
+  </div>
+</aside>
+
+<main>
+  <div id="view"></div>
+  <div class="tools">
+    <select id="ctab"></select>
+    <label><input type="checkbox" id="edit"> Mode edit (drag)</label>
+    <label><input type="checkbox" id="auto" checked> Putar 360°</label>
+    <label><input type="checkbox" id="walls" checked> Dinding &amp; pintu</label>
+    <label><input type="checkbox" id="labels"> Label</label>
+    <label>Potong tinggi <input type="range" id="clip" min="5" max="100" value="100"></label>
+    <button id="reset">Reset view</button>
+  </div>
+  <div id="toast"></div>
+  <div class="steps">
+    <button id="play">▶</button>
+    <input type="range" id="step" min="0" max="0" value="0">
+    <span id="stepLabel">0 / 0</span>
+  </div>
+</main>
+</div>
+<script src="js/tabs.js" defer></script>
+<script src="js/catalog.js" defer></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "cargo-loader-3d",
+  "version": "1.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx serve .",
+    "test": "node test/packer.test.js"
+  }
+}
